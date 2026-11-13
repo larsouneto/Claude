@@ -33,6 +33,7 @@ input[type=text],textarea,input[type=number]{width:100%;border:4px solid #000;bo
 .hist.ok{background:#e6ffc2}.hist.ko{background:#ffd3e6}
 label.f{display:block;margin:8px 0 4px;font-weight:700;font-size:14px}
 .help{font-size:13px;opacity:.8}
+.btn.on{background:#ffd21f;outline:4px solid #5b21c4}.btn.rk{flex:1 1 30%;font-size:18px;padding:10px 6px}.btn.dy{flex:1 1 30%}
 #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#000;color:#fff;padding:8px 16px;border-radius:99px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9}
 #toast.on{opacity:1}
 code{background:#eee;padding:1px 5px;border-radius:5px}
@@ -40,6 +41,16 @@ code{background:#eee;padding:1px 5px;border-radius:5px}
 <div class="wrap">
  <h1>ROUE DES DÉFIS</h1>
  <p class="sub">Télécommande · Event Brawl Stars 3 jours · <span id="conn" class="st">relais…</span> · salon <b id="room"></b></p>
+
+ <div class="card">
+  <h2>PROGRESSION RANKED</h2>
+  <div class="help" style="margin-bottom:6px">Rang actuel du joueur (barre de progression de l'overlay)</div>
+  <div class="row" id="ranks"></div>
+  <div class="row" style="margin-top:10px"><button class="btn g" id="pUp">RANG SUPÉRIEUR ▲</button><button class="btn s r" id="pDown" style="flex:0 0 auto">▼ RANG PRÉCÉDENT</button></div>
+  <div class="help" style="margin:12px 0 6px">Jour de l'event</div>
+  <div class="row" id="days"></div>
+  <div class="help" id="pInfo" style="margin-top:8px"></div>
+ </div>
 
  <div class="card y">
   <div class="row">
@@ -74,7 +85,7 @@ code{background:#eee;padding:1px 5px;border-radius:5px}
   <label class="f">Durée du tour : <b id="msv"></b> s</label><input type="range" id="sMs" min="4" max="14" step="1" style="width:100%">
   <label class="f"><input type="checkbox" id="sRem"> Retirer le défi de la roue après chaque tirage</label>
   <hr>
-  <p class="help"><b>OBS</b> : source « Navigateur » → cocher « Fichier local » → <code>Roue_Overlay_OBS.html</code>, taille 1920×1080. Elle reste transparente et invisible tant que tu n'as pas cliqué sur « AFFICHER LA ROUE ».<br>
+  <p class="help"><b>OBS (roue)</b> : source « Navigateur » → cocher « Fichier local » → <code>Roue_Overlay_OBS.html</code>, taille 1920×1080. Elle reste transparente et invisible tant que tu n'as pas cliqué sur « AFFICHER LA ROUE ».<br>
   <b>À distance</b> : ouvre cette télécommande sur n'importe quel appareil (même salon) ; plusieurs personnes peuvent la piloter en même temps.</p>
   <p class="help" id="roomInfo"></p>
  </div>
@@ -84,10 +95,11 @@ const CFG={room:'',server:'https://ntfy.sh'};
 (function(){const q=new URLSearchParams(location.search);if(q.get('room'))CFG.room=q.get('room');if(q.get('server'))CFG.server=q.get('server').replace(/\/$/,'');})();
 const TOPIC='slice-roue-'+CFG.room;
 // Bus : relais ntfy (distance) + BroadcastChannel (même navigateur)
-function makeBus(onState,onStatus){
-  const base=CFG.server+'/'+TOPIC, seen=new Set();
+const PTOPIC='slice-prog-'+CFG.room;
+function makeBus(onState,onStatus,topic){
+  const T=topic||TOPIC,base=CFG.server+'/'+T, seen=new Set();
   let es=null,last=0,bc=null;
-  try{bc=new BroadcastChannel(TOPIC);bc.onmessage=e=>{if(e.data&&e.data.v===1)onState(e.data,false)}}catch(e){}
+  try{bc=new BroadcastChannel(T);bc.onmessage=e=>{if(e.data&&e.data.v===1)onState(e.data,false)}}catch(e){}
   function handle(raw,id,initial){
     if(id){if(seen.has(id))return;seen.add(id)}
     let m;try{m=JSON.parse(raw)}catch(e){return}
@@ -213,4 +225,21 @@ $('#sDim').oninput=e=>{S.dim=e.target.value/100;$('#dimv').textContent=e.target.
 $('#sMs').oninput=e=>{S.ms=e.target.value*1000;$('#msv').textContent=e.target.value;later()};
 $('#sRem').onchange=e=>{S.removeAfter=e.target.checked;later()};
 renderItems();render();
+// ---------- Progression ----------
+const RK=['SILVER','GOLD','DIAMOND','MYTHIC','LEGENDARY','MASTERS 1'],PKEY='prog_ctrl_v1_'+CFG.room;
+let P=null;try{P=JSON.parse(localStorage.getItem(PKEY))}catch(e){}
+if(!P)P={rev:0,rank:0,day:1};
+const pbus=makeBus(m=>{if(m.rev>P.rev){P.rev=m.rev;P.rank=m.rank;P.day=m.day;try{localStorage.setItem(PKEY,JSON.stringify(P))}catch(e){}prender()}},()=>{},PTOPIC);
+function ppub(){P.rev=Math.max(Date.now(),P.rev+1);try{localStorage.setItem(PKEY,JSON.stringify(P))}catch(e){}pbus.send({v:1,type:'state',rev:P.rev,rank:P.rank,day:P.day});prender()}
+function prender(){
+  const R=$('#ranks');R.innerHTML='';
+  RK.forEach((n,i)=>{const b=document.createElement('button');b.className='btn rk'+(i===P.rank?' on':'')+(i<P.rank?' y':'');b.textContent=n;b.onclick=()=>{P.rank=i;ppub()};R.appendChild(b)});
+  const D=$('#days');D.innerHTML='';
+  [1,2,3].forEach(d=>{const b=document.createElement('button');b.className='btn dy'+(d===P.day?' on':'');b.textContent='JOUR '+d;b.onclick=()=>{P.day=d;ppub()};D.appendChild(b)});
+  $('#pUp').disabled=P.rank>=5;$('#pDown').disabled=P.rank<=0;
+  $('#pInfo').textContent='Affiché : '+RK[P.rank]+' · JOUR '+P.day+' / 3';
+}
+$('#pUp').onclick=()=>{if(P.rank<5){P.rank++;ppub()}};
+$('#pDown').onclick=()=>{if(P.rank>0){P.rank--;ppub()}};
+prender();
 </script></body></html>
