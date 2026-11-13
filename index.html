@@ -33,7 +33,7 @@ input[type=text],textarea,input[type=number]{width:100%;border:4px solid #000;bo
 .hist.ok{background:#e6ffc2}.hist.ko{background:#ffd3e6}
 label.f{display:block;margin:8px 0 4px;font-weight:700;font-size:14px}
 .help{font-size:13px;opacity:.8}
-.btn.on{background:#ffd21f;outline:4px solid #5b21c4}.btn.rk{flex:1 1 30%;font-size:18px;padding:10px 6px}.btn.dy{flex:1 1 30%}
+.g6{display:grid;grid-template-columns:44px repeat(6,1fr);gap:6px;margin-bottom:6px;align-items:stretch}.g6 .dl{font-family:'Lilita One';font-size:18px;display:flex;align-items:center;justify-content:center}.gc{border:4px solid #000;border-radius:10px;background:#fff;font-family:'Lilita One';font-size:13px;padding:10px 0;cursor:pointer;box-shadow:3px 3px 0 #000;color:#000}.gc:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #000}.gc.row{background:#f1e9ff}.gc.on{background:#ffd21f;outline:4px solid #5b21c4}.btn.on{background:#ffd21f;outline:4px solid #5b21c4}.btn.rk{flex:1 1 30%;font-size:18px;padding:10px 6px}.btn.dy{flex:1 1 30%}
 #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#000;color:#fff;padding:8px 16px;border-radius:99px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9}
 #toast.on{opacity:1}
 code{background:#eee;padding:1px 5px;border-radius:5px}
@@ -44,11 +44,9 @@ code{background:#eee;padding:1px 5px;border-radius:5px}
 
  <div class="card">
   <h2>PROGRESSION RANKED</h2>
-  <div class="help" style="margin-bottom:6px">Rang actuel du joueur (barre de progression de l'overlay)</div>
-  <div class="row" id="ranks"></div>
-  <div class="row" style="margin-top:10px"><button class="btn g" id="pUp">RANG SUPÉRIEUR ▲</button><button class="btn s r" id="pDown" style="flex:0 0 auto">▼ RANG PRÉCÉDENT</button></div>
-  <div class="help" style="margin:12px 0 6px">Jour de l'event</div>
-  <div class="row" id="days"></div>
+  <div class="help" style="margin-bottom:6px">1 clic = jour + rang. La case jaune est celle affichée sur le live.</div>
+  <div id="grid"></div>
+  <div class="row" style="margin-top:12px"><button class="btn g" id="pUp">RANG SUPÉRIEUR ▲</button><button class="btn s r" id="pDown" style="flex:0 0 auto">▼ RANG PRÉCÉDENT</button></div>
   <div class="help" id="pInfo" style="margin-top:8px"></div>
  </div>
 
@@ -231,11 +229,15 @@ let P=null;try{P=JSON.parse(localStorage.getItem(PKEY))}catch(e){}
 if(!P)P={rev:0,rank:0,day:1};
 const pbus=makeBus(m=>{if(m.rev>P.rev){P.rev=m.rev;P.rank=m.rank;P.day=m.day;try{localStorage.setItem(PKEY,JSON.stringify(P))}catch(e){}prender()}},()=>{},PTOPIC);
 function ppub(){P.rev=Math.max(Date.now(),P.rev+1);try{localStorage.setItem(PKEY,JSON.stringify(P))}catch(e){}pbus.send({v:1,type:'state',rev:P.rev,rank:P.rank,day:P.day});prender()}
+const SH=['SILVER','GOLD','DIAM.','MYTHIC','LEGEND.','MASTERS 1'];
 function prender(){
-  const R=$('#ranks');R.innerHTML='';
-  RK.forEach((n,i)=>{const b=document.createElement('button');b.className='btn rk'+(i===P.rank?' on':'')+(i<P.rank?' y':'');b.textContent=n;b.onclick=()=>{P.rank=i;ppub()};R.appendChild(b)});
-  const D=$('#days');D.innerHTML='';
-  [1,2,3].forEach(d=>{const b=document.createElement('button');b.className='btn dy'+(d===P.day?' on':'');b.textContent='JOUR '+d;b.onclick=()=>{P.day=d;ppub()};D.appendChild(b)});
+  const G=$('#grid');G.innerHTML='';
+  [1,2,3].forEach(d=>{
+    const row=document.createElement('div');row.className='g6';
+    row.innerHTML='<div class="dl">J'+d+'</div>';
+    RK.forEach((n,i)=>{const b=document.createElement('button');b.className='gc'+(d===P.day?' row':'')+(d===P.day&&i===P.rank?' on':'');b.textContent=SH[i];b.title='Jour '+d+' · '+n;b.onclick=()=>{P.day=d;P.rank=i;ppub()};row.appendChild(b)});
+    G.appendChild(row);
+  });
   $('#pUp').disabled=P.rank>=5;$('#pDown').disabled=P.rank<=0;
   $('#pInfo').textContent='Affiché : '+RK[P.rank]+' · JOUR '+P.day+' / 3';
 }
