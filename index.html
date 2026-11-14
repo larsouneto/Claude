@@ -227,7 +227,11 @@ renderItems();render();
 const RK=['SILVER','GOLD','DIAMOND','MYTHIC','LEGENDARY','MASTERS 1'],PKEY='prog_ctrl_v1_'+CFG.room;
 let P=null;try{P=JSON.parse(localStorage.getItem(PKEY))}catch(e){}
 if(!P)P={rev:0,rank:0,day:1};
-const pbus=makeBus(m=>{if(m.rev>P.rev){P.rev=m.rev;P.rank=m.rank;P.day=m.day;try{localStorage.setItem(PKEY,JSON.stringify(P))}catch(e){}prender()}},()=>{},PTOPIC);
+let gotRelay=false;
+const pbus=makeBus(m=>{gotRelay=true;if(m.rev>P.rev){P.rev=m.rev;P.rank=m.rank;P.day=m.day;try{localStorage.setItem(PKEY,JSON.stringify(P))}catch(e){}prender()}},()=>{},PTOPIC);
+function repub(){if(P.rev>0)pbus.send({v:1,type:'state',rev:P.rev,rank:P.rank,day:P.day})}
+setTimeout(()=>{if(!gotRelay)repub()},3000);   // le relais ne garde que 12 h : on republie l'état si rien n'est reçu
+setInterval(repub,20*60*1000);                    // et on le rafraîchit régulièrement
 function ppub(){P.rev=Math.max(Date.now(),P.rev+1);try{localStorage.setItem(PKEY,JSON.stringify(P))}catch(e){}pbus.send({v:1,type:'state',rev:P.rev,rank:P.rank,day:P.day});prender()}
 const SH=['SILVER','GOLD','DIAM.','MYTHIC','LEGEND.','MASTERS 1'];
 function prender(){
